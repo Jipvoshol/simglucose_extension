@@ -8,6 +8,7 @@ Implements core ideas:
 
 Note: this is a first, conservative subset without UAM/COB-predBG.
 """
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Dict
@@ -110,6 +111,3 @@ def determine_bolus(
 
     # Within range: no SMB
     return BolusAdvice(0.0, reason="in range")
-
-
-

@@ -24,6 +24,7 @@ Author: Jip Voshol
 License: MIT (consistent with OpenAPS oref0)
 Reference: https://github.com/openaps/oref0
 """
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Dict
@@ -97,11 +98,15 @@ def determine_basal(
 
     # If BG rises faster than expected, neutralize (conservative)
     if min_delta is not None and min_delta > expected_delta and min_delta > 0:
-        return BasalAdvice(rate_u_per_hr=current_basal, duration_min=temp_duration, reason="rising>expected")
+        return BasalAdvice(
+            rate_u_per_hr=current_basal, duration_min=temp_duration, reason="rising>expected"
+        )
 
     # Within range? neutral temp
     if min(eventual_bg, glucose_mgdl) < max_bg:
-        return BasalAdvice(rate_u_per_hr=current_basal, duration_min=temp_duration, reason="in-range")
+        return BasalAdvice(
+            rate_u_per_hr=current_basal, duration_min=temp_duration, reason="in-range"
+        )
 
     # High – calculate extra insulin requirement and temp rate
     insulin_req = max(0.0, (min(eventual_bg, glucose_mgdl) - target_bg) / sens)
@@ -113,5 +118,3 @@ def determine_basal(
     rate = min(max_safe_basal, rate)
 
     return BasalAdvice(rate_u_per_hr=rate, duration_min=temp_duration, reason="high-temp")
-
-

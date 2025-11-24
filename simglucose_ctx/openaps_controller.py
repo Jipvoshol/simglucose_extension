@@ -131,20 +131,20 @@ class OpenAPSController(Controller):
                     {
                         "date": int(self._now.timestamp() * 1000),  # epoch ms
                         "insulin": float(units_bolus),
-                        "type": "bolus"
+                        "type": "bolus",
                     }
                 )
-            
+
             # 2. Temp Basal treatment (net difference from scheduled)
             # CRITICAL FIX: OpenAPS tracks IOB based on deviation from scheduled basal.
             # Without this, high temp basals aren't seen as IOB (stacking risk)
             # and suspends aren't seen as negative IOB (slow recovery).
             scheduled_basal_u_hr = float(self.profile.get("current_basal", 0.0))
             scheduled_basal_u_min = scheduled_basal_u_hr / 60.0
-            
+
             net_basal_u_min = basal_u_per_min - scheduled_basal_u_min
             units_net_basal = net_basal_u_min * self._sample_time_min
-            
+
             # Only log if deviation is significant (e.g. > 0.001 U)
             # This handles both positive (high temp) and negative (suspend) IOB
             if abs(units_net_basal) > 0.001:
@@ -152,7 +152,7 @@ class OpenAPSController(Controller):
                     {
                         "date": int(self._now.timestamp() * 1000),
                         "insulin": float(units_net_basal),
-                        "type": "temp_basal"
+                        "type": "temp_basal",
                     }
                 )
 

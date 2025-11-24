@@ -1,6 +1,7 @@
 """
 IOB based on oref0/oref1.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -27,7 +28,7 @@ class IOBTotal:
 
 
 def _round(value: float, digits: int) -> float:
-    scale = 10 ** digits
+    scale = 10**digits
     return round(value * scale) / scale
 
 
@@ -76,7 +77,7 @@ def _iob_calc_bilinear(insulin_u: float, mins_ago: float, dia_h: float) -> Tuple
     elif scaled < end_min:
         mins_past_peak = scaled - peak_min
         activity_contrib = insulin_u * (activity_peak + (slope_down * mins_past_peak))
-        x2 = ((scaled - peak_min) / 5.0)
+        x2 = (scaled - peak_min) / 5.0
         iob_contrib = insulin_u * ((0.001323 * x2 * x2) + (-0.054233 * x2) + 0.555560)
 
     return activity_contrib, iob_contrib
@@ -123,7 +124,13 @@ def _iob_calc_exponential(
         a = 2 * tau / end_min
         S = 1.0 / (1 - a + (1 + a) * exp(-end_min / tau))
 
-        activity_contrib = insulin_u * (S / (tau * tau)) * mins_ago * (1 - mins_ago / end_min) * exp(-mins_ago / tau)
+        activity_contrib = (
+            insulin_u
+            * (S / (tau * tau))
+            * mins_ago
+            * (1 - mins_ago / end_min)
+            * exp(-mins_ago / tau)
+        )
         iob_contrib = insulin_u * (
             1
             - S
@@ -139,7 +146,12 @@ def _iob_calc_exponential(
 
 
 def _iob_calc_for_treatment(
-    treatment: Treatment, now_ms: int, curve: str, dia_h: float, peak_min: float, profile: Dict[str, Any]
+    treatment: Treatment,
+    now_ms: int,
+    curve: str,
+    dia_h: float,
+    peak_min: float,
+    profile: Dict[str, Any],
 ) -> Tuple[float, float]:
     if treatment.insulin is None:
         return 0.0, 0.0
@@ -209,5 +221,3 @@ def iob_total(
         bolusinsulin=_round(bolusinsulin, 3),
         time=datetime.utcfromtimestamp(now_ms / 1000.0),
     )
-
-
