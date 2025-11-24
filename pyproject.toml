@@ -1,0 +1,108 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simglucose-context-patch"
+version = "1.0.0"
+authors = [
+    {name = "Jip Voshol", email = "jip.voshol@student.uva.nl"}
+]
+description = "Context-aware insulin sensitivity modulation for SimGlucose T1D simulator"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+keywords = [
+    "diabetes",
+    "t1d",
+    "type-1-diabetes",
+    "insulin",
+    "simglucose",
+    "simulation",
+    "biometric",
+    "heart-rate",
+    "context-aware",
+    "exercise",
+    "stress"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Natural Language :: English",
+]
+
+dependencies = [
+    "simglucose>=0.2.9",
+    "pandas>=1.0.0,<3.0",
+    "numpy>=1.18.0,<2.0",
+    "scipy>=1.11.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.10",
+    "black>=21.0",
+    "flake8>=3.8",
+    "mypy>=0.800",
+    "matplotlib>=3.5.0",
+]
+docs = [
+    "sphinx>=3.0",
+    "sphinx-rtd-theme>=0.5",
+    "myst-parser>=0.15",
+]
+
+[project.urls]
+Homepage = "https://github.com/Jipvoshol/simglucose-context-patch"
+Documentation = "https://github.com/Jipvoshol/simglucose-context-patch#readme"
+Repository = "https://github.com/Jipvoshol/simglucose-context-patch"
+Issues = "https://github.com/Jipvoshol/simglucose-context-patch/issues"
+Changelog = "https://github.com/Jipvoshol/simglucose-context-patch/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["simglucose_ctx*", "openaps_logic*"]
+exclude = ["tests*", "examples*", "docs*"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers"
+testpaths = [
+    "tests",
+]
+pythonpath = [
+    "."
+]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
