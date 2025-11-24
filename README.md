@@ -1,6 +1,6 @@
-# SimGlucose Context Patch
+# SimGlucose Extension
 
-**Context-aware insulin sensitivity modulation for the [SimGlucose](https://github.com/jxx123/simglucose) Type 1 Diabetes simulator.**
+**Exercise and stress dynamics for the [SimGlucose](https://github.com/jxx123/simglucose) Type 1 Diabetes simulator.**
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -73,14 +73,14 @@ See [API_REFERENCE.md](API_REFERENCE.md) for complete parameter documentation.
 ### From GitHub (Recommended)
 
 ```bash
-pip install git+https://github.com/Jipvoshol/simglucose-context-patch.git
+pip install git+https://github.com/Jipvoshol/simglucose_extension.git
 ```
 
 ### From Source (Development)
 
 ```bash
-git clone https://github.com/Jipvoshol/simglucose-context-patch.git
-cd simglucose-context-patch
+git clone https://github.com/Jipvoshol/simglucose_extension.git
+cd simglucose_extension
 pip install -e .
 ```
 
@@ -102,7 +102,7 @@ The plot below demonstrates how the patch alters glucose dynamics compared to a 
     *   **Exercise (Orange zone):** The context-aware patient (purple line) shows a significant glucose drop due to increased insulin sensitivity ($m > 1$) and non-insulin mediated uptake ($V_{m0}$ boost). The baseline patient (blue dashed) remains flat, ignoring the exercise.
     *   **Stress (Red zone):** The context-aware patient shows reduced insulin sensitivity ($m < 1$), leading to a higher glucose peak compared to baseline.
 
-![Example Dynamics](examples/comparison_adolescent001_seed3_standard.png)
+![Example Dynamics](docs/images/example_dynamics.png)
 *Figure: Comparison of glucose dynamics with and without the context patch. Note how the controller (bottom panels) reacts differently to the altered physiology.*
 
 ## Quick Start
@@ -345,11 +345,11 @@ pytest tests/test_context_edge_cases.py -v
 If you use this patch in your research, please cite:
 
 ```bibtex
-@software{voshol2025simglucose_context,
+@software{voshol2025simglucose_extension,
   author = {Voshol, Jip},
-  title = {SimGlucose Context Patch: Context-Aware Insulin Sensitivity Modulation},
+  title = {SimGlucose Extension: Exercise and Stress Dynamics for Diabetes Simulation},
   year = {2025},
-  url = {https://github.com/Jipvoshol/simglucose-context-patch}
+  url = {https://github.com/Jipvoshol/simglucose_extension}
 }
 ```
 
