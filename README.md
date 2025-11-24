@@ -102,7 +102,7 @@ The plot below demonstrates how the patch alters glucose dynamics compared to a 
     *   **Exercise (Orange zone):** The context-aware patient (purple line) shows a significant glucose drop due to increased insulin sensitivity ($m > 1$) and non-insulin mediated uptake ($V_{m0}$ boost). The baseline patient (blue dashed) remains flat, ignoring the exercise.
     *   **Stress (Red zone):** The context-aware patient shows reduced insulin sensitivity ($m < 1$), leading to a higher glucose peak compared to baseline.
 
-![Example Dynamics](docs/images/example_dynamics.png)
+![Example Dynamics](comparison_adolescent001_seed3_standard.png)
 *Figure: Comparison of glucose dynamics with and without the context patch. Note how the controller (bottom panels) reacts differently to the altered physiology.*
 
 ## Quick Start
