@@ -107,9 +107,6 @@ def context_cfg() -> ContextConfig:
         ema_half_life_min=8.0,
         stress_hr_supp_pow=2.0,
         stress_hr_off_threshold=0.75,
-        use_asymmetric_kinetics=True,
-        tau_onset_min=8.0,
-        tau_offset_min=40.0,
     )
 
 

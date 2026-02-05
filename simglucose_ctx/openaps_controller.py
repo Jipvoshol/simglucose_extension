@@ -18,7 +18,7 @@ Simplifications vs most advanced OpenAPS:
 
 from __future__ import annotations
 from typing import Any, Dict, List, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from simglucose.controller.base import Controller, Action
 
@@ -68,7 +68,7 @@ class OpenAPSController(Controller):
         # Track controller time for IOB/Activity calculation
         # Init timestamp (arbitrary: realtime start). Then discrete steps of sample_time.
         if self._now is None:
-            self._now = datetime.utcnow()
+            self._now = datetime.now(timezone.utc)
 
         # Track new meal intake
         meal_flow = float(info.get("meal", 0.0))

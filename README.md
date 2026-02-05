@@ -216,7 +216,7 @@ The hybrid strategy addresses both issues:
 
 This modulates the physiological simulation. Controller adaptation (ISF-patch) is separate work.
 
-See DOCUMENTATION.md §6.6-6.7 for full rationale and validation results.
+See [API_REFERENCE.md](API_REFERENCE.md) for full rationale and parameter documentation.
 
 ## Notes
 - Exercise → m(t) > 1 increases sensitivity (Vm0/Vmx up); stress → m(t) < 1 reduces it

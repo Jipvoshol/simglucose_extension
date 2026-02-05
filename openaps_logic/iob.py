@@ -5,7 +5,7 @@ IOB based on oref0/oref1.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from math import exp
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -39,7 +39,7 @@ def _as_epoch_ms(dt: Union[int, float, datetime]) -> int:
 
 
 def _now_ms(now: Optional[datetime]) -> int:
-    return _as_epoch_ms(now or datetime.utcnow())
+    return _as_epoch_ms(now or datetime.now(timezone.utc))
 
 
 def _ensure_treatments(objs: Iterable[Dict[str, Any]]) -> List[Treatment]:
@@ -170,7 +170,7 @@ def iob_total(
     now_ms = _now_ms(now)
     treatments = _ensure_treatments(treatments_input)
     if not treatments:
-        return IOBTotal(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime.utcfromtimestamp(now_ms / 1000))
+        return IOBTotal(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, datetime.fromtimestamp(now_ms / 1000, tz=timezone.utc))
 
     dia = float(profile.get("dia", 6.0))
     if dia < 3.0:
@@ -219,5 +219,5 @@ def iob_total(
         bolusiob=_round(bolusiob, 3),
         netbasalinsulin=_round(netbasalinsulin, 3),
         bolusinsulin=_round(bolusinsulin, 3),
-        time=datetime.utcfromtimestamp(now_ms / 1000.0),
+        time=datetime.fromtimestamp(now_ms / 1000.0, tz=timezone.utc),
     )
