@@ -42,14 +42,10 @@ class ContextConfig:
     vm0_exponent_exercise: float = 3.5  # Exponential boost for AMPK (10-20x literature)
     vmx_exponent_exercise: float = 0.2  # Minimal scaling to avoid math artifacts
 
-    # Advanced features (sigmoid-based + asymmetric kinetics)
+    # Sigmoid-based HR intensity mapping (alternative to linear)
     use_sigmoid: bool = False  # Use sigmoid instead of linear for HRR
     sigmoid_threshold: float = 0.5  # θ in sigmoid (HRR center point)
     sigmoid_width: float = 0.15  # b in sigmoid (transition sharpness)
-    use_asymmetric_kinetics: bool = False  # Different rise/fall times
-    tau_onset_min: float = 10.0  # Rise time (exercise onset)
-    tau_offset_min: float = 30.0  # Fall time (post-exercise)
-    use_log_additive: bool = False  # Log-space combination (more stable)
 
     # Validation (v1.0 feature)
     strict_validation: bool = False  # Enable strict errors (will be default in v2.0)
@@ -126,15 +122,15 @@ class ContextStream:
         self,
         hr: pd.Series,
         eda: pd.Series,
-        cfg: ContextConfig = ContextConfig(),
+        cfg: Optional[ContextConfig] = None,
         preprocess: bool = True,
         eda_min_max: Optional[tuple] = None,
     ):
-        self.cfg = cfg
+        self.cfg = cfg if cfg is not None else ContextConfig()
         self.prev_m = 1.0
 
         if preprocess:
-            rule = f"{cfg.dt_minutes}min"
+            rule = f"{self.cfg.dt_minutes}min"
             hr = hr.sort_index().astype(float).resample(rule).mean().ffill()
             eda = eda.sort_index().astype(float).resample(rule).mean().ffill()
 
@@ -147,7 +143,7 @@ class ContextStream:
             eda = _clip(eda)
 
             # Exponential moving average smoothing
-            alpha = 1 - np.exp(-np.log(2) / (cfg.ema_half_life_min / cfg.dt_minutes))
+            alpha = 1 - np.exp(-np.log(2) / (self.cfg.ema_half_life_min / self.cfg.dt_minutes))
             hr = hr.ewm(alpha=alpha, adjust=False).mean()
             eda = eda.ewm(alpha=alpha, adjust=False).mean()
 
@@ -169,7 +165,7 @@ class ContextStream:
 
             # Fill remaining NaNs with sensible defaults
             # Forward fill → backward fill → default value
-            hr = hr.ffill().bfill().fillna(cfg.hr_rest)
+            hr = hr.ffill().bfill().fillna(self.cfg.hr_rest)
             eda = eda.ffill().bfill().fillna(0.0)
 
         self.hr = hr
@@ -248,6 +244,12 @@ class ContextStream:
 
         hr = float(self.hr.loc[idx])
         eda = float(self.eda.loc[idx])
+
+        # Guard against NaN (can occur when preprocess=False)
+        if np.isnan(hr):
+            hr = cfg.hr_rest
+        if np.isnan(eda):
+            eda = 0.0
 
         I = self._intensity_hr(hr)
         S = self._stress_idx(eda)
