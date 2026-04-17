@@ -81,11 +81,18 @@ class OpenAPSController(Controller):
         cob = self._compute_cob()
 
         # Determine IOB/Activity via openaps_py.iob over already delivered insulin
-        from openaps_logic.iob import iob_total  # local import to avoid cycles
+        from openaps_logic.iob import iob_total, iob_forecast  # local import to avoid cycles
 
         iobres = iob_total(self._treatments, self.profile, now=self._now)
         iob = float(iobres.iob)
         activity = float(iobres.activity)  # U/min
+
+        # 4-hour IOB forecast for oref0-style prediction loop (48 ticks × 5 min)
+        iob_forecast_ticks = iob_forecast(
+            self._treatments, self.profile, now=self._now,
+            horizon_min=240, tick_min=5,
+        )
+
         # Compute deltas uit interne geschiedenis (5-min stap)
         self._bg_hist.append(glucose)
         if len(self._bg_hist) > 12:
@@ -103,7 +110,11 @@ class OpenAPSController(Controller):
             min_delta=min_delta,
             short_avgdelta=short_avgdelta,
             long_avgdelta=long_avgdelta,
+            iob_forecast_ticks=iob_forecast_ticks,
+            cob_g=cob,
         )
+        # Expose the basal_advice's diagnostics on the controller for logging
+        self.last_basal_advice = basal_advice
         # sample_time via kwargs
         st = info.get("sample_time") or self._sample_time_min
         try:

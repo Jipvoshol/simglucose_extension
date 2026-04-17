@@ -221,3 +221,85 @@ def iob_total(
         bolusinsulin=_round(bolusinsulin, 3),
         time=datetime.fromtimestamp(now_ms / 1000.0, tz=timezone.utc),
     )
+
+
+def iob_forecast(
+    treatments_input: Iterable[Dict[str, Any]],
+    profile: Dict[str, Any],
+    now: Optional[datetime] = None,
+    horizon_min: int = 240,
+    tick_min: int = 5,
+) -> List[IOBTotal]:
+    """
+    Forecast insulin-on-board and activity at each future 5-minute tick
+    over the next `horizon_min` minutes. Mirrors the `iobArray` that oref0's
+    determine-basal uses for its prediction loop.
+
+    Returns a list of IOBTotal snapshots, one per tick (default 48 ticks × 5 min
+    = 4 h horizon). Each snapshot reports iob/activity as they will be at that
+    future moment given only currently-recorded treatments (no new insulin is
+    planned — the decay of existing treatments is projected forward).
+
+    This is the `iobWithZeroTemp`-equivalent in the simplified setting: since
+    our `treatments` log does not include future scheduled basal as virtual
+    treatments, projecting forward with no additions is already "what happens
+    if no more insulin is given". If in future we want a proper non-zero-temp
+    track, we'd add scheduled-basal treatments over the horizon.
+    """
+    now_ms = _now_ms(now)
+    treatments = _ensure_treatments(treatments_input)
+
+    dia = float(profile.get("dia", 6.0))
+    if dia < 3.0:
+        dia = 3.0
+    curve_defaults = {
+        "bilinear": {"requireLongDia": False, "peak": 75.0},
+        "rapid-acting": {"requireLongDia": True, "peak": 75.0},
+        "ultra-rapid": {"requireLongDia": True, "peak": 55.0},
+    }
+    curve = str(profile.get("curve", "bilinear")).lower()
+    if curve not in curve_defaults:
+        curve = "rapid-acting"
+    defaults = curve_defaults[curve]
+    if defaults.get("requireLongDia") and dia < 5.0:
+        dia = 5.0
+    peak_min = float(defaults.get("peak", 75.0))
+
+    dia_ms = int(dia * 60 * 60 * 1000)
+    ticks: List[IOBTotal] = []
+    n_ticks = max(1, int(horizon_min / tick_min))
+    tick_ms = int(tick_min * 60 * 1000)
+
+    for i in range(1, n_ticks + 1):
+        future_ms = now_ms + i * tick_ms
+        dia_ago_ms = future_ms - dia_ms
+        iob_sum = 0.0
+        activity_sum = 0.0
+        if not treatments:
+            ticks.append(IOBTotal(
+                iob=0.0, activity=0.0, basaliob=0.0, bolusiob=0.0,
+                netbasalinsulin=0.0, bolusinsulin=0.0,
+                time=datetime.fromtimestamp(future_ms / 1000.0, tz=timezone.utc),
+            ))
+            continue
+        for tr in treatments:
+            # Skip treatments that are in the future (haven't been given yet)
+            # or that are older than DIA at this future point.
+            if tr.date_ms > future_ms or tr.date_ms <= dia_ago_ms:
+                continue
+            a_contrib, iob_contrib = _iob_calc_for_treatment(
+                tr, future_ms, curve, dia, peak_min, profile
+            )
+            if iob_contrib:
+                iob_sum += iob_contrib
+                activity_sum += a_contrib or 0.0
+        ticks.append(IOBTotal(
+            iob=_round(iob_sum, 3),
+            activity=_round(activity_sum, 4),
+            basaliob=0.0,
+            bolusiob=0.0,
+            netbasalinsulin=0.0,
+            bolusinsulin=0.0,
+            time=datetime.fromtimestamp(future_ms / 1000.0, tz=timezone.utc),
+        ))
+    return ticks
