@@ -86,13 +86,57 @@ def apply_vmx_multiplier(
     else:
         m = float(m_value)
 
-    if m > 1.0:
-        # EXERCISE: Minimal scaling to avoid mathematical artifacts at low insulin
-        exponent = ctx.cfg.vmx_exponent_exercise if hasattr(ctx, "cfg") else 0.2
-        vmx_factor = m**exponent
+    if not hasattr(patient, "_ctx_vmx_state"):
+        patient._ctx_vmx_state = {
+            "exercise_minutes": 0.0,
+            "last_ts": None,
+            "tail_factor": 1.0,
+            "duration_gain": 1.0,
+        }
+    state = patient._ctx_vmx_state
+    cfg = ctx.cfg if hasattr(ctx, "cfg") else None
+    now = pd.Timestamp(now_ts)
+    last_ts = state.get("last_ts")
+    if last_ts is None:
+        dt_min = 0.0
     else:
-        # STRESS: Linear scaling (stress induces real insulin resistance)
-        vmx_factor = m
+        dt_min = max(0.0, (now - pd.Timestamp(last_ts)).total_seconds() / 60.0)
+    if last_ts is not None and dt_min == 0.0 and cfg is not None:
+        dt_min = float(getattr(cfg, "dt_minutes", 5.0))
+
+    if m > 1.0:
+        # EXERCISE: scale Vmx through the insulin-mediated sensitivity pathway.
+        exponent = getattr(cfg, "vmx_exponent_exercise", 0.2) if cfg is not None else 0.2
+        state["exercise_minutes"] = float(state.get("exercise_minutes", 0.0)) + dt_min
+        gain_per_hour = getattr(cfg, "vmx_duration_gain_per_hour", 0.0) if cfg is not None else 0.0
+        gain_cap = getattr(cfg, "vmx_duration_gain_cap", 1.0) if cfg is not None else 1.0
+        duration_gain = 1.0 + gain_per_hour * state["exercise_minutes"] / 60.0
+        duration_gain = min(float(gain_cap), float(duration_gain))
+        vmx_factor = (m**exponent) * duration_gain
+        factor_cap = getattr(cfg, "vmx_factor_cap", None) if cfg is not None else None
+        if factor_cap is not None:
+            vmx_factor = min(float(vmx_factor), float(factor_cap))
+        state["tail_factor"] = max(1.0, float(vmx_factor))
+        state["duration_gain"] = float(duration_gain)
+    else:
+        state["exercise_minutes"] = 0.0
+        state["duration_gain"] = 1.0
+        decay_half_life = getattr(cfg, "vmx_decay_half_life_min", None) if cfg is not None else None
+        if m >= 1.0 and decay_half_life is not None and state.get("tail_factor", 1.0) > 1.0:
+            decay = 0.5 ** (dt_min / float(decay_half_life))
+            vmx_factor = 1.0 + (float(state["tail_factor"]) - 1.0) * decay
+            state["tail_factor"] = float(vmx_factor)
+            if vmx_factor < 1.001:
+                vmx_factor = 1.0
+                state["tail_factor"] = 1.0
+        else:
+            # STRESS: Linear scaling (stress induces real insulin resistance).
+            # Positive post-exercise decay is not applied during m<1 stress states.
+            vmx_factor = m
+            if m < 1.0:
+                state["tail_factor"] = 1.0
+
+    state["last_ts"] = now
 
     # Apply multiplier to Vmx
     vmx_eff = float(vmx_base * vmx_factor)

@@ -68,6 +68,11 @@ class ContextAwareT1DSimEnv(T1DSimEnv):
         self._current_m = 1.0
         self._current_hr = None
         self._current_eda = None
+        self._current_vmx_factor = 1.0
+        self._current_vm0_factor = 1.0
+        self._current_p2u_factor = 1.0
+        self._current_vmx_duration_gain = 1.0
+        self._current_exercise_minutes = 0.0
 
         # Logging buffers (using deque for O(1) append/eviction)
         self._log_time = deque(maxlen=self._max_log_size)
@@ -75,6 +80,11 @@ class ContextAwareT1DSimEnv(T1DSimEnv):
         self._log_vmx = deque(maxlen=self._max_log_size)
         self._log_p2u = deque(maxlen=self._max_log_size)
         self._log_vm0 = deque(maxlen=self._max_log_size)
+        self._log_vmx_factor = deque(maxlen=self._max_log_size)
+        self._log_vm0_factor = deque(maxlen=self._max_log_size)
+        self._log_p2u_factor = deque(maxlen=self._max_log_size)
+        self._log_vmx_duration_gain = deque(maxlen=self._max_log_size)
+        self._log_exercise_minutes = deque(maxlen=self._max_log_size)
 
     def mini_step(self, action: Action):
         # 0) Contextual modulation before state update
@@ -82,6 +92,11 @@ class ContextAwareT1DSimEnv(T1DSimEnv):
         self._current_m = 1.0  # default
         self._current_hr = None
         self._current_eda = None
+        self._current_vmx_factor = 1.0
+        self._current_vm0_factor = 1.0
+        self._current_p2u_factor = 1.0
+        self._current_vmx_duration_gain = 1.0
+        self._current_exercise_minutes = 0.0
 
         if self._ctx is not None:
             # calculate one m(t) for consistent logging and reuse
@@ -119,12 +134,24 @@ class ContextAwareT1DSimEnv(T1DSimEnv):
             if self._mod_vm0:
                 apply_vm0_multiplier(self.patient, now_ts, self._ctx, self._vm0_base, m_value=mval)
 
+            self._current_vmx_factor = float(self.patient._params.Vmx) / max(self._vmx_base, 1e-12)
+            self._current_p2u_factor = float(self.patient._params.p2u) / max(self._p2u_base, 1e-12)
+            self._current_vm0_factor = float(self.patient._params.Vm0) / max(self._vm0_base, 1e-12)
+            vmx_state = getattr(self.patient, "_ctx_vmx_state", {})
+            self._current_vmx_duration_gain = float(vmx_state.get("duration_gain", 1.0))
+            self._current_exercise_minutes = float(vmx_state.get("exercise_minutes", 0.0))
+
             # logging
             self._log_time.append(pd.Timestamp(now_ts))
             self._log_m.append(float(mval))
             self._log_vmx.append(float(self.patient._params.Vmx))
             self._log_p2u.append(float(self.patient._params.p2u))
             self._log_vm0.append(float(self.patient._params.Vm0))
+            self._log_vmx_factor.append(self._current_vmx_factor)
+            self._log_p2u_factor.append(self._current_p2u_factor)
+            self._log_vm0_factor.append(self._current_vm0_factor)
+            self._log_vmx_duration_gain.append(self._current_vmx_duration_gain)
+            self._log_exercise_minutes.append(self._current_exercise_minutes)
 
         # 1) Continue with standard mini_step logic (basal/bolus + state update)
         return super().mini_step(action)
@@ -147,6 +174,11 @@ class ContextAwareT1DSimEnv(T1DSimEnv):
         new_info["context_m"] = self._current_m
         new_info["context_hr"] = self._current_hr
         new_info["context_eda"] = self._current_eda
+        new_info["context_vmx_factor"] = self._current_vmx_factor
+        new_info["context_vm0_factor"] = self._current_vm0_factor
+        new_info["context_p2u_factor"] = self._current_p2u_factor
+        new_info["context_vmx_duration_gain"] = self._current_vmx_duration_gain
+        new_info["context_exercise_minutes"] = self._current_exercise_minutes
 
         # log the requested action (controller output)
         try:
@@ -175,6 +207,13 @@ class ContextAwareT1DSimEnv(T1DSimEnv):
         self._log_vmx.clear()
         self._log_p2u.clear()
         self._log_vm0.clear()
+        self._log_vmx_factor.clear()
+        self._log_p2u_factor.clear()
+        self._log_vm0_factor.clear()
+        self._log_vmx_duration_gain.clear()
+        self._log_exercise_minutes.clear()
+        if hasattr(self.patient, "_ctx_vmx_state"):
+            delattr(self.patient, "_ctx_vmx_state")
 
         return super().reset()
 
@@ -194,6 +233,11 @@ class ContextAwareT1DSimEnv(T1DSimEnv):
                 "Vmx": list(self._log_vmx),
                 "p2u": list(self._log_p2u),
                 "Vm0": list(self._log_vm0),
+                "Vmx_factor": list(self._log_vmx_factor),
+                "p2u_factor": list(self._log_p2u_factor),
+                "Vm0_factor": list(self._log_vm0_factor),
+                "vmx_duration_gain": list(self._log_vmx_duration_gain),
+                "exercise_minutes": list(self._log_exercise_minutes),
             },
             index=pd.to_datetime(list(self._log_time)),
         )

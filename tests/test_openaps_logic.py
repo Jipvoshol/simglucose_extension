@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from openaps_logic.basal import determine_basal, BasalAdvice
 from openaps_logic.bolus import determine_bolus, BolusAdvice
 from openaps_logic.iob import iob_total, IOBTotal
+from simglucose_ctx.openaps_controller import OpenAPSController
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +170,133 @@ class TestDetermineBolus:
         )
         assert advice.units == 0.0
         assert "spike" in advice.reason
+
+    def test_forecast_below_target_suppresses_smb_despite_high_current_bg(self, profile):
+        """Forecast-aware SMB should not anchor on current BG when predictions are safe/low."""
+        profile = dict(profile, enableSMB_always=True)
+        advice = determine_bolus(
+            220.0,
+            iob_u=0.0,
+            cob_g=0.0,
+            profile=profile,
+            minutes_since_last_bolus=10.0,
+            min_pred_bg=95.0,
+            min_guard_bg=85.0,
+            eventual_bg=100.0,
+        )
+        assert advice.units == 0.0
+        assert advice.smb_veto_reason == "forecast_not_high"
+
+    def test_min_guard_bg_below_threshold_vetoes_smb(self, profile):
+        """Mirror oref0's minGuardBG safety veto for SMB."""
+        profile = dict(profile, enableSMB_always=True)
+        advice = determine_bolus(
+            220.0,
+            iob_u=0.0,
+            cob_g=0.0,
+            profile=profile,
+            minutes_since_last_bolus=10.0,
+            min_pred_bg=180.0,
+            min_guard_bg=60.0,
+            eventual_bg=190.0,
+        )
+        assert advice.units == 0.0
+        assert advice.smb_veto_reason == "min_guard_bg_below_threshold"
+
+    def test_forecast_above_target_doses_smb_with_cap_and_increment(self, profile):
+        """Forecast-aware SMB uses min(minPredBG, eventualBG), cap, and bolus increment."""
+        profile = dict(profile, enableSMB_always=True)
+        advice = determine_bolus(
+            220.0,
+            iob_u=0.0,
+            cob_g=0.0,
+            profile=profile,
+            minutes_since_last_bolus=10.0,
+            min_pred_bg=180.0,
+            min_guard_bg=100.0,
+            eventual_bg=190.0,
+        )
+        assert advice.units == 0.5
+        assert advice.smb_projection_bg == 180.0
+        assert advice.smb_insulin_req == pytest.approx(1.5)
+
+    def test_higher_sens_reduces_forecast_smb_insulin_req(self, profile):
+        """The patched ISF should propagate through SMB insulinReq, not only basal."""
+        p50 = dict(profile, sens=50.0, current_basal=2.0, maxSMBBasalMinutes=60, enableSMB_always=True)
+        p100 = dict(p50, sens=100.0)
+        common = dict(
+            glucose_mgdl=220.0,
+            iob_u=0.0,
+            cob_g=0.0,
+            minutes_since_last_bolus=10.0,
+            min_pred_bg=180.0,
+            min_guard_bg=100.0,
+            eventual_bg=190.0,
+        )
+        adv50 = determine_bolus(profile=p50, **common)
+        adv100 = determine_bolus(profile=p100, **common)
+        assert adv100.smb_insulin_req < adv50.smb_insulin_req
+        assert adv100.units < adv50.units
+
+    def test_high_temp_target_disables_smb_unless_allowed(self, profile):
+        """oref0 disables SMB under high temp target unless explicitly allowed."""
+        high_tt = dict(
+            profile,
+            min_bg=140,
+            max_bg=160,
+            temptargetSet=True,
+            enableSMB_always=True,
+            allowSMB_with_high_temptarget=False,
+        )
+        advice = determine_bolus(
+            240.0,
+            iob_u=0.0,
+            cob_g=0.0,
+            profile=high_tt,
+            minutes_since_last_bolus=10.0,
+            min_pred_bg=220.0,
+            min_guard_bg=150.0,
+            eventual_bg=230.0,
+        )
+        assert advice.units == 0.0
+        assert advice.smb_veto_reason == "high_temp_target"
+
+        allowed = dict(high_tt, allowSMB_with_high_temptarget=True)
+        allowed_advice = determine_bolus(
+            240.0,
+            iob_u=0.0,
+            cob_g=0.0,
+            profile=allowed,
+            minutes_since_last_bolus=10.0,
+            min_pred_bg=220.0,
+            min_guard_bg=150.0,
+            eventual_bg=230.0,
+        )
+        assert allowed_advice.units > 0.0
+
+    def test_controller_passes_basal_forecast_diagnostics_to_bolus(self, profile, monkeypatch):
+        """OpenAPSController should pass basal minPred/minGuard into determine_bolus."""
+        captured = {}
+
+        def fake_bolus(*args, **kwargs):
+            captured.update(kwargs)
+            return BolusAdvice(0.0, reason="captured")
+
+        monkeypatch.setattr(
+            "simglucose_ctx.openaps_controller.determine_bolus",
+            fake_bolus,
+        )
+        ctrl = OpenAPSController(profile)
+
+        class Obs:
+            CGM = 180.0
+
+        ctrl.policy(Obs(), reward=0.0, done=False, sample_time=5.0)
+        assert "min_pred_bg" in captured
+        assert "min_guard_bg" in captured
+        assert "eventual_bg" in captured
+        assert captured["min_pred_bg"] is not None
+        assert captured["min_guard_bg"] is not None
 
 
 # ===========================================================================

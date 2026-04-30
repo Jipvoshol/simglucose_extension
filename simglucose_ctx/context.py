@@ -41,6 +41,10 @@ class ContextConfig:
     # Vm0/Vmx scaling exponents (hybrid strategy)
     vm0_exponent_exercise: float = 3.5  # Exponential boost for AMPK (10-20x literature)
     vmx_exponent_exercise: float = 0.2  # Minimal scaling to avoid math artifacts
+    vmx_duration_gain_per_hour: float = 0.0
+    vmx_duration_gain_cap: float = 1.0
+    vmx_decay_half_life_min: Optional[float] = None
+    vmx_factor_cap: Optional[float] = None
 
     # Sigmoid-based HR intensity mapping (alternative to linear)
     use_sigmoid: bool = False  # Use sigmoid instead of linear for HRR
@@ -76,6 +80,22 @@ class ContextConfig:
 
         if self.vmx_exponent_exercise < 0:
             errors.append(f"vmx_exponent_exercise ({self.vmx_exponent_exercise}) must be >= 0")
+
+        if self.vmx_duration_gain_per_hour < 0:
+            errors.append(
+                f"vmx_duration_gain_per_hour ({self.vmx_duration_gain_per_hour}) must be >= 0"
+            )
+
+        if self.vmx_duration_gain_cap < 1.0:
+            errors.append(f"vmx_duration_gain_cap ({self.vmx_duration_gain_cap}) must be >= 1.0")
+
+        if self.vmx_decay_half_life_min is not None and self.vmx_decay_half_life_min <= 0:
+            errors.append(
+                f"vmx_decay_half_life_min ({self.vmx_decay_half_life_min}) must be > 0"
+            )
+
+        if self.vmx_factor_cap is not None and self.vmx_factor_cap < 1.0:
+            errors.append(f"vmx_factor_cap ({self.vmx_factor_cap}) must be >= 1.0")
 
         if self.night_cap is not None and not (0 < self.night_cap < 1):
             errors.append(f"night_cap ({self.night_cap}) must be in range (0, 1)")

@@ -79,6 +79,7 @@ class OpenAPSController(Controller):
 
         # Calculate persistent COB with absorption
         cob = self._compute_cob()
+        self.last_cob = float(cob)
 
         # Determine IOB/Activity via openaps_py.iob over already delivered insulin
         from openaps_logic.iob import iob_total, iob_forecast  # local import to avoid cycles
@@ -86,6 +87,12 @@ class OpenAPSController(Controller):
         iobres = iob_total(self._treatments, self.profile, now=self._now)
         iob = float(iobres.iob)
         activity = float(iobres.activity)  # U/min
+        self.last_iob = iob
+        self.last_activity = activity
+        self.last_basaliob = float(iobres.basaliob)
+        self.last_bolusiob = float(iobres.bolusiob)
+        self.last_netbasalinsulin = float(iobres.netbasalinsulin)
+        self.last_bolusinsulin = float(iobres.bolusinsulin)
 
         # 4-hour IOB forecast for oref0-style prediction loop (48 ticks × 5 min)
         iob_forecast_ticks = iob_forecast(
@@ -115,6 +122,14 @@ class OpenAPSController(Controller):
         )
         # Expose the basal_advice's diagnostics on the controller for logging
         self.last_basal_advice = basal_advice
+        self.last_basal_rate_u_per_hr = float(basal_advice.rate_u_per_hr)
+        self.last_basal_duration_min = float(basal_advice.duration_min)
+        self.last_basal_reason = basal_advice.reason
+        self.last_min_guard_bg = basal_advice.min_guard_bg
+        self.last_min_pred_bg = basal_advice.min_pred_bg
+        self.last_eventual_bg = basal_advice.eventual_bg
+        self.last_naive_eventual_bg = basal_advice.naive_eventual_bg
+        self.last_deviation = basal_advice.deviation
         # sample_time via kwargs
         st = info.get("sample_time") or self._sample_time_min
         try:
@@ -123,8 +138,24 @@ class OpenAPSController(Controller):
             pass
 
         bolus_advice = determine_bolus(
-            glucose, iob, cob, self.profile, self._last_bolus_mins, min_delta=min_delta
+            glucose,
+            iob,
+            cob,
+            self.profile,
+            self._last_bolus_mins,
+            min_delta=min_delta,
+            min_pred_bg=basal_advice.min_pred_bg,
+            min_guard_bg=basal_advice.min_guard_bg,
+            eventual_bg=basal_advice.eventual_bg,
+            naive_eventual_bg=basal_advice.naive_eventual_bg,
         )
+        self.last_bolus_advice = bolus_advice
+        self.last_bolus_units = float(bolus_advice.units)
+        self.last_bolus_reason = bolus_advice.reason
+        self.last_smb_projection_bg = bolus_advice.smb_projection_bg
+        self.last_smb_insulin_req = bolus_advice.smb_insulin_req
+        self.last_smb_enabled = bool(bolus_advice.smb_enabled)
+        self.last_smb_veto_reason = bolus_advice.smb_veto_reason
 
         # SimGlucose expects U/min; profile values are often U/hr → divide by 60
         basal_u_per_min = float(basal_advice.rate_u_per_hr) / 60.0
@@ -187,4 +218,15 @@ class OpenAPSController(Controller):
         self._treatments.clear()
         self._cob_entries.clear()
         self._now = None
+        self.last_cob = 0.0
+        self.last_iob = 0.0
+        self.last_activity = 0.0
+        self.last_basaliob = 0.0
+        self.last_bolusiob = 0.0
+        self.last_netbasalinsulin = 0.0
+        self.last_bolusinsulin = 0.0
+        self.last_smb_projection_bg = None
+        self.last_smb_insulin_req = None
+        self.last_smb_enabled = False
+        self.last_smb_veto_reason = None
         return None
